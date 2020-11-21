@@ -1,24 +1,33 @@
 <template>
   <div id="home">
     <nav-bar class="home-nav"><div slot="center">购物街</div></nav-bar>
-    <scroll class="content" 
-    ref="scroll" 
-    :probeType="3" 
-    @scroll="contentScroll"
-    :pullUpLoad="true"
-    @pullingUp="loadMore">
-      <home-swiper :banners="banners"></home-swiper>
+    <tab-control
+      class="tab-control"
+      ref="tabControl1"
+      :titles="['流行', '新款', '精选']"
+      @tabClick="tabClick"
+      v-show="isTabFixed"
+    ></tab-control>
+    <scroll
+      class="content"
+      ref="scroll"
+      :probeType="3"
+      @scroll="contentScroll"
+      :pull-up-load="true"
+      @pullingUp="loadMore"
+    >
+      <home-swiper :banners="banners" @swiperImageLoad="swiperImageLoad"></home-swiper>
       <recommend-view :recommends="recommends"></recommend-view>
       <feature-view></feature-view>
       <tab-control
-        class="tab-control"
+        ref="tabControl2"
         :titles="['流行', '新款', '精选']"
         @tabClick="tabClick"
       ></tab-control>
       <goods-list :goods="showGoods"></goods-list>
     </scroll>
 
-    <back-top @click.native='topClick' v-show="isShowBackTop"></back-top>
+    <back-top @click.native="topClick" v-show="isShowBackTop"></back-top>
   </div>
 </template>
 
@@ -31,9 +40,11 @@ import NavBar from "../../components/common/navbar/NavBar.vue";
 import TabControl from "../../components/content/tabControl/TabControl.vue";
 import GoodsList from "../../components/content/goodsList/GoodsList.vue";
 import Scroll from "../../components/common/scroll/Scroll.vue";
-import BackTop from '../../components/content/backTop/BackTop.vue'
+import BackTop from "../../components/content/backTop/BackTop.vue";
 
 import { getHomeMultidata, getHomeData } from "../../network/home.js";
+import { debounce } from "../../common/utils.js";
+
 export default {
   name: "Home",
   components: {
@@ -56,7 +67,10 @@ export default {
         sell: { page: 0, list: [] },
       },
       currentType: "pop",
-      isShowBackTop: false
+      isShowBackTop: false,
+      tabControlTop: 0,
+      isTabFixed: false,
+      scrollY: 0
     };
   },
   created() {
@@ -64,6 +78,24 @@ export default {
     this.getHomeData("pop");
     this.getHomeData("new");
     this.getHomeData("sell");
+  },
+  mounted() {
+    // 接收发送的图片加载完成事件，进行刷新
+    // 防抖操作，避免频繁操作
+    const refresh = debounce(this.$refs.scroll.refresh, 200);
+    // 这里上拉加载更多也加上防抖操作，避免使用时多次上拉取到后面的数据
+    const finishPullUp = debounce(this.$refs.scroll.finishPullUp, 200);
+    this.$bus.$on("itemImageLoad", () => {
+      refresh();
+      finishPullUp();
+    });
+  },
+  activated(){
+    this.$refs.scroll.scrollTo(0, this.scrollY, 0);
+    this.$refs.scroll.refresh()
+  },
+  deactivated(){
+    this.scrollY = this.$refs.scroll.getScrollY();
   },
   computed: {
     showGoods() {
@@ -84,21 +116,29 @@ export default {
           this.currentType = "sell";
           break;
       }
+      this.$refs.tabControl2.currentIndex = index;
+      this.$refs.tabControl1.currentIndex = index;
     },
     // 点击返回顶部
     topClick() {
-      this.$refs.scroll.scrollTo(0, 0, 300)
+      this.$refs.scroll.scrollTo(0, 0, 300);
     },
 
     // 显示回到顶部按钮
     contentScroll(position) {
-      this.isShowBackTop = (-position.y) > 1000
+      this.isShowBackTop = -position.y > 1000;
+      this.isTabFixed = -position.y > this.tabControlTop
     },
 
     // 加载更多
     loadMore() {
       this.getHomeData(this.currentType);
-      this.$refs.scroll.finishPullUp()
+      // this.$refs.scroll.finishPullUp()
+    },
+
+    // 在轮播图加载后获取tabcontrol位置
+    swiperImageLoad() {
+    this.tabControlTop = this.$refs.tabControl2.$el.offsetTop;
     },
 
     // 网络请求
@@ -123,7 +163,6 @@ export default {
 
 <style scoped>
 #home {
-  padding-top: 44px;
   /* 让界面高度为100个视口高度 */
   height: 100vh;
   position: relative;
@@ -132,16 +171,10 @@ export default {
 .home-nav {
   background-color: var(--color-tint);
   color: white;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 9999;
 }
 
 .tab-control {
-  position: sticky;
-  top: 44px;
+  position: relative;
   z-index: 9;
 }
 
