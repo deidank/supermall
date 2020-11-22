@@ -40,10 +40,10 @@ import NavBar from "../../components/common/navbar/NavBar.vue";
 import TabControl from "../../components/content/tabControl/TabControl.vue";
 import GoodsList from "../../components/content/goodsList/GoodsList.vue";
 import Scroll from "../../components/common/scroll/Scroll.vue";
-import BackTop from "../../components/content/backTop/BackTop.vue";
 
 import { getHomeMultidata, getHomeData } from "../../network/home.js";
 import { debounce } from "../../common/utils.js";
+import { backTopMixin } from "../../common/Mixins.js";
 
 export default {
   name: "Home",
@@ -55,7 +55,6 @@ export default {
     TabControl,
     GoodsList,
     Scroll,
-    BackTop,
   },
   data() {
     return {
@@ -67,12 +66,13 @@ export default {
         sell: { page: 0, list: [] },
       },
       currentType: "pop",
-      isShowBackTop: false,
       tabControlTop: 0,
       isTabFixed: false,
-      scrollY: 0
+      scrollY: 0,
+      itemListener: null
     };
   },
+  mixins:[backTopMixin],
   created() {
     this.getHomeMultidata();
     this.getHomeData("pop");
@@ -83,12 +83,13 @@ export default {
     // 接收发送的图片加载完成事件，进行刷新
     // 防抖操作，避免频繁操作
     const refresh = debounce(this.$refs.scroll.refresh, 200);
-    // 这里上拉加载更多也加上防抖操作，避免使用时多次上拉取到后面的数据
-    const finishPullUp = debounce(this.$refs.scroll.finishPullUp, 200);
-    this.$bus.$on("itemImageLoad", () => {
+    this.itemListener = () => {
       refresh();
       finishPullUp();
-    });
+    };
+    // 这里上拉加载更多也加上防抖操作，避免使用时多次上拉取到后面的数据
+    const finishPullUp = debounce(this.$refs.scroll.finishPullUp, 200);
+    this.$bus.$on("itemImageLoad", this.itemListener);
   },
   activated(){
     this.$refs.scroll.scrollTo(0, this.scrollY, 0);
@@ -96,6 +97,7 @@ export default {
   },
   deactivated(){
     this.scrollY = this.$refs.scroll.getScrollY();
+    this.$bus.$off("itemImageLoad", this.itemListener)
   },
   computed: {
     showGoods() {
@@ -120,13 +122,10 @@ export default {
       this.$refs.tabControl1.currentIndex = index;
     },
     // 点击返回顶部
-    topClick() {
-      this.$refs.scroll.scrollTo(0, 0, 300);
-    },
 
     // 显示回到顶部按钮
     contentScroll(position) {
-      this.isShowBackTop = -position.y > 1000;
+      this.listenShowBackTop(position);
       this.isTabFixed = -position.y > this.tabControlTop
     },
 
