@@ -29,7 +29,7 @@
       <goods-list ref="goods" :goods="recommends"></goods-list>
     </scroll>
     <back-top v-if="isShowBackTop" @click.native="topClick"></back-top>
-    <detail-bottom-bar></detail-bottom-bar>
+    <detail-bottom-bar @addCart="addToCart"></detail-bottom-bar>
   </div>
 </template>
 
@@ -41,14 +41,14 @@ import DetailShopInfo from "./childComponents/DetailShopInfo.vue";
 import DetailGoodsInfo from "./childComponents/DetailGoodsInfo.vue";
 import DetailParamsInfo from "./childComponents/DetailParamsInfo.vue";
 import DetailCommentInfo from "./childComponents/DetailCommentInfo.vue";
-import DetailBottomBar from "./childComponents/DetailBottomBar.vue"
+import DetailBottomBar from "./childComponents/DetailBottomBar.vue";
 
 import Scroll from "../../components/common/scroll/Scroll.vue";
 import GoodsList from "../../components/content/goodsList/GoodsList.vue";
 
-
 import { debounce } from "../../common/utils.js";
 import { itemListenerMixin, backTopMixin } from "../../common/Mixins.js";
+import { mapActions } from "vuex";
 
 import {
   getDetailData,
@@ -85,11 +85,14 @@ export default {
       themeTopYs: [],
       getThemeTopY: null,
       currentIndex: 0,
-      isShowBackTop: false
+      isShowBackTop: false,
     };
   },
   mixins: [itemListenerMixin, backTopMixin],
   methods: {
+    ...mapActions({
+      add: "addCart",
+    }),
     imageLoad() {
       this.newRefresh();
       // 调用获取组件离顶部高度函数
@@ -120,8 +123,36 @@ export default {
         }
       }
 
-      this.listenShowBackTop(position)
-    }
+      this.listenShowBackTop(position);
+    },
+    // 添加购物车
+    addToCart() {
+      const product = {};
+      product.image = this.topImages[0];
+      product.title = this.goods.title;
+      product.desc = this.goods.desc;
+      product.price = this.goods.realPrice;
+      product.iid = this.iid;
+
+      // this.$store.commit('addCart', product)
+
+      // 1.使用mapActions引入addCart方法
+      // this.add(product).then((res) => {
+      //   this.message = res;
+      //   this.isShowToast = true;
+
+      //   setTimeout(() => {
+      //     this.isShowToast = false;
+      //   }, 1500);
+      //   // 2.原始的$store.dispatch调用
+      //   // this.$store.dispatch("addCart", product).then((res) => {
+      //   //   console.log(res);
+      // });
+
+      this.add(product).then((res) => {
+        this.$toast.show(res, 2000);
+      });
+    },
   },
   created() {
     // 获取商品ID
@@ -198,6 +229,6 @@ export default {
 }
 
 .content {
-  height: calc(100% - 93px );
+  height: calc(100% - 93px);
 }
 </style>
